@@ -15,7 +15,7 @@ interface User {
 }
 
 interface AdminUserTableProps {
-  initialUsers: users[]
+  initialUsers: User[]
 }
 
 export function AdminUserTable({ initialUsers }: AdminUserTableProps) {
