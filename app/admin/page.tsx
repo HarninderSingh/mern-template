@@ -4,52 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { AdminUserTable } from "@/components/admin-user-table"
-import { headers } from "next/headers" // <-- Used to get request headers for URL construction
-
-interface User {
-  _id: string
-  name?: string
-  email: string
-  role: "user" | "admin"
-  createdAt: string
-}
-
-// This async function is responsible for fetching user data from your API.
-async function fetchUsers(): Promise<User[]> {
-  // 1. Dynamically construct the base URL for the API call
-  const headersList = headers()
-  const protocol = headersList.get("x-forwarded-proto") || "http"
-  const host = headersList.get("host")
-  const baseUrl = `${protocol}://${host}`
-
-  console.log("Fetching users from:", `${baseUrl}/api/users`)
-
-  // 2. Make a server-side fetch request to your API route
-  const res = await fetch(`${baseUrl}/api/users`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    cache: "no-store", // Ensures the data is always fresh, not cached by Next.js
-  })
-
-  // 3. Handle the response
-  if (!res.ok) {
-    console.error("Failed to fetch users from API:", res.status, res.statusText)
-    try {
-      const errorData = await res.json()
-      console.error("API Error Details:", errorData)
-    } catch (e) {
-      console.error("Could not parse error response body.")
-    }
-    return [] // Return an empty array on error
-  }
-
-  // 4. Parse the JSON response and return the users
-  const users = await res.json()
-  console.log("Users received in AdminPage:", users)
-  return users
-}
+import dbConnect from "@/lib/mongodb" // Import dbConnect
+import User from "@/models/User" // Import User model
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions)
@@ -76,8 +32,17 @@ export default async function AdminPage() {
     )
   }
 
-  // Call the fetchUsers function to get the data
-  const users = await fetchUsers()
+  let users: any[] = []
+  try {
+    await dbConnect() // Connect to the database
+    // Fetch users directly from MongoDB
+    users = await User.find({}, "-password").sort({ createdAt: -1 }).lean() // .lean() for plain JS objects
+    console.log(`Fetched ${users.length} users directly in AdminPage.`)
+    console.log("First 5 fetched users:", JSON.stringify(users.slice(0, 5), null, 2))
+  } catch (error) {
+    console.error("Error fetching users directly in AdminPage:", error)
+    // Handle error, perhaps show a message to the admin
+  }
 
   return (
     <Card className="w-full max-w-3xl">
@@ -86,7 +51,6 @@ export default async function AdminPage() {
         <CardDescription className="text-gray-300">Manage all registered users.</CardDescription>
       </CardHeader>
       <CardContent className="p-4">
-        {/* Pass the fetched users to the client component */}
         <AdminUserTable initialUsers={users} />
       </CardContent>
     </Card>
